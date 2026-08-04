@@ -52,6 +52,14 @@ export async function POST(
   if (room.current_turn !== color) {
     return NextResponse.json({ error: "상대의 턴입니다." }, { status: 409 });
   }
+  // 지뢰 모드에서 방금 착수를 마쳤고 지뢰 설치 단계라면, 착수(move) API가 아니라
+  // 지뢰 설치(mine) API를 호출해야 한다.
+  if (room.phase !== "move") {
+    return NextResponse.json(
+      { error: "지금은 지뢰를 설치할 칸을 선택할 차례입니다." },
+      { status: 409 }
+    );
+  }
 
   const board: Board = room.board;
   if (!board[y] || board[y][x] === undefined) {
@@ -82,12 +90,14 @@ export async function POST(
     if (hitMine) {
       await supabase.from("mines").update({ consumed: true }).eq("id", hitMine.id);
 
+      // 착수가 무효화된 경우: 지뢰 설치 단계 없이 곧바로 턴이 넘어간다.
       const lastMove: LastMove = { type: "blocked", color, x, y };
       const { data: updatedRoom } = await supabase
         .from("rooms")
         .update({
           current_turn: nextColor,
           turn_number: turnNumber + 1,
+          phase: "move",
           last_move: lastMove,
         })
         .eq("id", room.id)
@@ -119,18 +129,24 @@ export async function POST(
 
   const isWin = checkWin(newBoard, x, y, color);
   const isDraw = !isWin && isBoardFull(newBoard);
+  const gameOver = isWin || isDraw;
 
   const lastMove: LastMove = { type: "stone", color, x, y };
+
+  // 지뢰 모드 + 게임이 끝나지 않았다면: 턴을 넘기지 않고 같은 플레이어가
+  // 이어서 지뢰 설치 칸을 골라야 한다 (phase='place_mine').
+  const shouldEnterMinePhase = room.mode === "mine" && !gameOver;
 
   const { data: updatedRoom, error: updateError } = await supabase
     .from("rooms")
     .update({
       board: newBoard,
-      current_turn: nextColor,
-      turn_number: turnNumber + 1,
+      current_turn: shouldEnterMinePhase ? color : nextColor,
+      turn_number: shouldEnterMinePhase ? turnNumber : turnNumber + 1,
+      phase: shouldEnterMinePhase ? "place_mine" : "move",
       last_move: lastMove,
       winner: isWin ? color : isDraw ? "draw" : null,
-      status: isWin || isDraw ? "finished" : "playing",
+      status: gameOver ? "finished" : "playing",
     })
     .eq("id", room.id)
     .select()

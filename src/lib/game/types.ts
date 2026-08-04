@@ -25,6 +25,9 @@ export interface RoomRow {
   host_nickname: string;
   guest_nickname: string | null;
   current_turn: StoneColor;
+  // 지뢰 모드 전용 턴 진행 단계: 'move' = 착수 대기, 'place_mine' = 방금 착수한
+  // 플레이어가 같은 턴에 지뢰 설치 칸을 골라야 하는 단계 (현재 턴 플레이어는 안 바뀜)
+  phase: "move" | "place_mine";
   winner: StoneColor | "draw" | null;
   board: Board;
   last_move: LastMove | null;

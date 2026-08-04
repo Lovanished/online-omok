@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { computeMineExpiry, isMineStillActive } from "@/lib/game/mine";
-import { Board, LastMove, StoneColor } from "@/lib/game/types";
+import { Board, StoneColor } from "@/lib/game/types";
 
 export async function POST(
   req: NextRequest,
@@ -49,6 +49,13 @@ export async function POST(
   const color: StoneColor = player.color;
   if (room.current_turn !== color) {
     return NextResponse.json({ error: "상대의 턴입니다." }, { status: 409 });
+  }
+  // 착수를 먼저 마치고 이 단계에 들어와야 지뢰를 설치할 수 있다.
+  if (room.phase !== "place_mine") {
+    return NextResponse.json(
+      { error: "먼저 착수를 해야 지뢰를 설치할 수 있습니다." },
+      { status: 409 }
+    );
   }
 
   const board: Board = room.board;
@@ -107,16 +114,15 @@ export async function POST(
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
+  // 지뢰 설치까지 끝나야 비로소 턴이 상대에게 넘어간다.
+  // last_move는 방금 둔 돌 위치를 그대로 유지한다 (지뢰 위치는 절대 공개하지 않음).
   const nextColor: StoneColor = color === "black" ? "white" : "black";
-  // 지뢰 설치는 "행동"만 공개하고 좌표는 절대 공개하지 않는다.
-  const lastMove: LastMove = { type: "mine", color };
-
   const { data: updatedRoom, error: updateError } = await supabase
     .from("rooms")
     .update({
       current_turn: nextColor,
       turn_number: turnNumber + 1,
-      last_move: lastMove,
+      phase: "move",
     })
     .eq("id", room.id)
     .select()

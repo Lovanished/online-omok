@@ -17,6 +17,9 @@ create table if not exists rooms (
   host_nickname text not null,
   guest_nickname text,
   current_turn text default 'black',        -- black | white
+  phase text not null default 'move' check (phase in ('move', 'place_mine')),
+                                             -- 지뢰 모드 전용: 'move'=착수 대기, 'place_mine'=방금 착수한
+                                             -- 플레이어가 같은 턴에 지뢰 설치 칸을 골라야 함
   winner text,                              -- black | white | draw | null
   board jsonb not null default '[]'::jsonb, -- 15x15 돌 배치 (공개 정보만)
   last_move jsonb,                          -- {x,y,color,invalidatedByMine}

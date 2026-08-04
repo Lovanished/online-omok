@@ -27,19 +27,20 @@ export default function RoomClient({
   session: Session;
 }) {
   const { room, messages, emojiEvents, sendChat, sendEmoji } = useRoomRealtime(initialRoom);
-  const [placingMine, setPlacingMine] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const isMyTurn = room.current_turn === session.color && room.status === "playing";
   const waitingForOpponent = room.status === "waiting";
+  // 지뢰 모드에서 방금 착수를 마치고, 같은 턴에 지뢰 설치 칸을 골라야 하는 단계인지
+  const mustPlaceMine = room.mode === "mine" && room.phase === "place_mine" && isMyTurn;
 
   async function handleCellClick(x: number, y: number) {
     if (!isMyTurn || busy) return;
     setBusy(true);
     setActionError(null);
     try {
-      const endpoint = placingMine
+      const endpoint = mustPlaceMine
         ? `/api/rooms/${room.code}/mine`
         : `/api/rooms/${room.code}/move`;
       const res = await fetch(endpoint, {
@@ -52,16 +53,16 @@ export default function RoomClient({
         setActionError(data.error);
         return;
       }
-      setPlacingMine(false);
     } finally {
       setBusy(false);
     }
   }
 
-  const opponentColor: StoneColor = session.color === "black" ? "white" : "black";
   const opponentNickname =
     session.color === "black" ? room.guest_nickname : room.host_nickname;
   const myNickname = session.color === "black" ? room.host_nickname : room.guest_nickname;
+  const opponentIsPlacingMine =
+    room.mode === "mine" && room.phase === "place_mine" && !isMyTurn && room.status === "playing";
 
   return (
     <main className="min-h-screen p-4 md:p-8 flex flex-col items-center gap-6">
@@ -96,8 +97,22 @@ export default function RoomClient({
       )}
 
       {room.status === "playing" && (
-        <p className={isMyTurn ? "text-emerald-400 font-semibold" : "text-gray-400"}>
-          {isMyTurn ? "내 차례입니다." : `${opponentNickname ?? "상대"}의 차례입니다.`}
+        <p
+          className={
+            mustPlaceMine
+              ? "text-red-400 font-semibold"
+              : isMyTurn
+              ? "text-emerald-400 font-semibold"
+              : "text-gray-400"
+          }
+        >
+          {mustPlaceMine
+            ? "💣 이어서 지뢰를 설치할 칸을 선택하세요 (빈 칸 아무 곳이나)."
+            : isMyTurn
+            ? "내 차례입니다. 돌을 놓을 칸을 선택하세요."
+            : opponentIsPlacingMine
+            ? `${opponentNickname ?? "상대"}가 지뢰를 설치할 칸을 고르는 중입니다...`
+            : `${opponentNickname ?? "상대"}의 차례입니다.`}
         </p>
       )}
 
@@ -107,23 +122,11 @@ export default function RoomClient({
           lastMove={room.last_move}
           disabled={!isMyTurn || busy}
           onCellClick={handleCellClick}
-          placingMine={placingMine}
+          placingMine={mustPlaceMine}
         />
       </div>
 
       {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
-
-      {room.mode === "mine" && room.status === "playing" && (
-        <button
-          onClick={() => setPlacingMine((v) => !v)}
-          disabled={!isMyTurn || busy}
-          className={`px-4 py-2 rounded-lg font-semibold disabled:opacity-40 ${
-            placingMine ? "bg-red-500 text-white" : "bg-gray-700 hover:bg-gray-600"
-          }`}
-        >
-          {placingMine ? "지뢰 설치 취소" : "💣 지뢰 설치 모드"}
-        </button>
-      )}
 
       <div className="w-full max-w-md space-y-3">
         <EmojiBar events={emojiEvents} onSend={(emoji) => sendEmoji(session.nickname, emoji)} />
