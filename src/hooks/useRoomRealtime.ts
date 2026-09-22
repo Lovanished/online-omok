@@ -26,7 +26,6 @@ export function useRoomRealtime(initialRoom: RoomRow) {
   const channelRef = useRef<ReturnType<typeof supabaseBrowser.channel> | null>(null);
 
   useEffect(() => {
-    // 초기 채팅 기록 로드
     supabaseBrowser
       .from("chat_messages")
       .select("*")

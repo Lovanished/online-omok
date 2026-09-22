@@ -64,7 +64,6 @@ export function checkExactFive(
 ): boolean {
   for (const [dx, dy] of DIRECTIONS) {
     const line = encodeLine(board, x, y, dx, dy, color, 5);
-    // 5연속 S가 있고, 그 앞뒤가 S가 아니면(=6개 이상 아니면) 정확한 5
     const re = /S{5}/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(line))) {
@@ -104,7 +103,6 @@ function hasFourInDirection(
   color: StoneColor
 ): boolean {
   const line = encodeLine(board, x, y, dx, dy, color, 5);
-  // 길이 5 윈도우 중 S가 4개, .이 1개인 패턴 = 그 . 자리에 두면 5완성
   for (let start = 0; start <= line.length - 5; start++) {
     const window = line.slice(start, start + 5);
     const sCount = (window.match(/S/g) || []).length;
@@ -131,7 +129,6 @@ function hasOpenThreeInDirection(
 /**
  * 흑돌 금수(禁手) 판정: 장목, 33(쌍삼), 44(쌍사)
  * 렌주 룰: 해당 수로 정확히 5를 완성하면(장목이 아닌 이상) 금수보다 승리가 우선한다.
- * 반환값: 금수면 그 이유 문자열, 금수가 아니면 null
  */
 export function checkForbiddenMove(
   board: Board,
@@ -139,13 +136,10 @@ export function checkForbiddenMove(
   y: number,
   color: StoneColor
 ): string | null {
-  // 백돌에는 금수가 없다 (표준 렌주룰)
   if (color !== "black") return null;
 
-  // 장목은 항상 금수 (5를 만들어도 무효)
   if (checkOverline(board, x, y, color)) return "장목(6목 이상)";
 
-  // 정확히 5를 완성하면 금수보다 승리 우선
   if (checkExactFive(board, x, y, color)) return null;
 
   let fourCount = 0;
@@ -160,7 +154,7 @@ export function checkForbiddenMove(
   return null;
 }
 
-/** 착수 후 승리 여부 (정확히 5 이상 - 백은 장목도 승리, 흑은 정확히 5만) */
+/** 착수 후 승리 여부 (백은 장목도 승리, 흑은 정확히 5만) */
 export function checkWin(
   board: Board,
   x: number,
@@ -168,14 +162,12 @@ export function checkWin(
   color: StoneColor
 ): boolean {
   if (color === "white") {
-    // 백은 장목 제한 없음: 5개 이상 연속이면 승리
     for (const [dx, dy] of DIRECTIONS) {
       const line = encodeLine(board, x, y, dx, dy, color, 6);
       if (/S{5,}/.test(line)) return true;
     }
     return false;
   }
-  // 흑은 정확히 5만 승리 (장목은 금수라 이 함수 호출 전 이미 걸러짐)
   return checkExactFive(board, x, y, color);
 }
 

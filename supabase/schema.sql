@@ -1,6 +1,8 @@
 -- ============================================================
--- 오목 온라인 - Supabase 스키마
+-- 오목 온라인 - Supabase 스키마 (v2: 재대국/랜덤 흑백/기권/무승부 포함)
 -- Supabase 대시보드 > SQL Editor 에서 그대로 실행하세요.
+-- 이미 예전 버전을 실행한 적이 있다면 supabase/migrations/ 안의 파일들을
+-- 번호 순서대로 실행하는 편이 더 안전합니다 (README 참고).
 -- ============================================================
 
 create extension if not exists "pgcrypto";
@@ -10,7 +12,7 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------
 create table if not exists rooms (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null,               -- 6자리 초대 코드
+  code text unique not null,                -- 6자리 초대 코드
   mode text not null default 'normal',      -- normal | mine | extreme
   status text not null default 'waiting',   -- waiting | playing | finished
   board_size int not null default 15,
@@ -18,27 +20,34 @@ create table if not exists rooms (
   guest_nickname text,
   current_turn text default 'black',        -- black | white
   phase text not null default 'move' check (phase in ('move', 'place_mine')),
-                                             -- 지뢰 모드 전용: 'move'=착수 대기, 'place_mine'=방금 착수한
-                                             -- 플레이어가 같은 턴에 지뢰 설치 칸을 골라야 함
+                                             -- 지뢰 모드 전용: 'move'=착수 대기,
+                                             -- 'place_mine'=방금 착수한 플레이어가
+                                             -- 같은 턴에 지뢰 설치 칸을 골라야 함
   winner text,                              -- black | white | draw | null
   board jsonb not null default '[]'::jsonb, -- 15x15 돌 배치 (공개 정보만)
-  last_move jsonb,                          -- {x,y,color,invalidatedByMine}
+  last_move jsonb,                          -- {type,x,y,color}
   turn_number int not null default 0,
+  draw_offered_by text check (draw_offered_by in ('host', 'guest')),
+  rematch_host_requested boolean not null default false,
+  rematch_guest_requested boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------
--- players: 방에 접속한 플레이어 (플레이어 식별용, 인증 없이 세션 토큰 기반)
+-- players: 방에 접속한 플레이어
+-- seat(host/guest)는 방을 만들었는지/참가했는지를 나타내는 "고정 신분"이고,
+-- color(black/white)는 판마다 랜덤으로 재배정되는 "이번 판의 색"이다.
 -- ---------------------------------------------------------------
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references rooms(id) on delete cascade,
+  seat text not null check (seat in ('host', 'guest')),
   color text not null check (color in ('black', 'white')),
   nickname text not null,
   session_token uuid not null default gen_random_uuid(), -- 클라이언트가 보관, 본인 인증용
   created_at timestamptz not null default now(),
-  unique (room_id, color)
+  unique (room_id, seat)
 );
 
 -- ---------------------------------------------------------------
@@ -80,8 +89,10 @@ alter table chat_messages enable row level security;
 -- rooms: 누구나 읽기 가능(보드는 공개 정보만 들어있음), 쓰기는 API(service role)만
 create policy "rooms_select_all" on rooms for select using (true);
 
--- players: 자신의 row는 못 읽어도 되지만, 방 참가자 존재 확인을 위해 읽기 허용(닉네임/색상만 노출)
-create policy "players_select_all" on players for select using (true);
+-- players: session_token이 들어있는 민감한 테이블이므로 클라이언트(anon key)에는
+-- 어떤 select 정책도 주지 않는다. 필요한 공개 정보(닉네임/색상)는 rooms 테이블의
+-- host_nickname/guest_nickname 과, 클라이언트가 이미 들고 있는 자기 세션으로 충분하고,
+-- "내 색상 갱신"은 /api/rooms/[code]/me 서버 API(service role)를 통해서만 조회한다.
 
 -- chat_messages: 누구나 읽기/쓰기 가능 (방 코드 기반 공개 채팅)
 create policy "chat_select_all" on chat_messages for select using (true);
@@ -91,11 +102,10 @@ create policy "chat_insert_all" on chat_messages for insert with check (true);
 -- service role key(API route)는 RLS를 우회하므로 서버에서만 접근 가능.
 
 -- ---------------------------------------------------------------
--- Realtime 활성화 (Supabase 대시보드 > Database > Replication 에서도 설정 가능)
+-- Realtime 활성화
 -- ---------------------------------------------------------------
 alter publication supabase_realtime add table rooms;
 alter publication supabase_realtime add table chat_messages;
-alter publication supabase_realtime add table players;
 
 -- rooms.updated_at 자동 갱신 트리거
 create or replace function set_updated_at()

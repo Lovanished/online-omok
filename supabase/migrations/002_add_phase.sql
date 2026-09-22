@@ -1,5 +1,5 @@
--- 이미 supabase/schema.sql을 한 번 실행해서 rooms 테이블이 이미 있다면,
--- Supabase SQL Editor에서 이 파일만 추가로 실행하세요.
+-- 이미 supabase/schema.sql(v1)을 실행해서 rooms 테이블이 이미 있다면,
+-- Supabase SQL Editor에서 이 파일을 추가로 실행하세요.
 -- (schema.sql을 처음부터 새로 실행하는 경우에는 필요 없습니다 - 이미 포함되어 있음)
 
 alter table rooms

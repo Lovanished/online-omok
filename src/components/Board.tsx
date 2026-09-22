@@ -24,11 +24,7 @@ export default function Board({ board, lastMove, disabled, onCellClick, placingM
     >
       {board.map((row, y) =>
         row.map((cell, x) => {
-          const isLast =
-            lastMove &&
-            lastMove.type !== "mine" &&
-            lastMove.x === x &&
-            lastMove.y === y;
+          const isLast = lastMove && lastMove.x === x && lastMove.y === y;
           return (
             <button
               key={`${x}-${y}`}

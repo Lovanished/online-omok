@@ -52,8 +52,6 @@ export async function POST(
   if (room.current_turn !== color) {
     return NextResponse.json({ error: "상대의 턴입니다." }, { status: 409 });
   }
-  // 지뢰 모드에서 방금 착수를 마쳤고 지뢰 설치 단계라면, 착수(move) API가 아니라
-  // 지뢰 설치(mine) API를 호출해야 한다.
   if (room.phase !== "move") {
     return NextResponse.json(
       { error: "지금은 지뢰를 설치할 칸을 선택할 차례입니다." },
@@ -78,7 +76,7 @@ export async function POST(
       .from("mines")
       .select("*")
       .eq("room_id", room.id)
-      .eq("owner_color", nextColor) // 상대(=지뢰 주인)가 설치한 지뢰
+      .eq("owner_color", nextColor)
       .eq("x", x)
       .eq("y", y)
       .eq("consumed", false);
@@ -90,7 +88,6 @@ export async function POST(
     if (hitMine) {
       await supabase.from("mines").update({ consumed: true }).eq("id", hitMine.id);
 
-      // 착수가 무효화된 경우: 지뢰 설치 단계 없이 곧바로 턴이 넘어간다.
       const lastMove: LastMove = { type: "blocked", color, x, y };
       const { data: updatedRoom } = await supabase
         .from("rooms")

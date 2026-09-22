@@ -35,7 +35,12 @@ export default function HomePage() {
       if (!res.ok) throw new Error(data.error);
       localStorage.setItem(
         `gomoku:${data.room.code}`,
-        JSON.stringify({ sessionToken: data.sessionToken, color: data.color, nickname })
+        JSON.stringify({
+          sessionToken: data.sessionToken,
+          color: data.color,
+          nickname,
+          isHost: true,
+        })
       );
       router.push(`/room/${data.room.code}`);
     } catch (e: any) {
@@ -63,7 +68,12 @@ export default function HomePage() {
       if (!res.ok) throw new Error(data.error);
       localStorage.setItem(
         `gomoku:${code}`,
-        JSON.stringify({ sessionToken: data.sessionToken, color: data.color, nickname })
+        JSON.stringify({
+          sessionToken: data.sessionToken,
+          color: data.color,
+          nickname,
+          isHost: false,
+        })
       );
       router.push(`/room/${code}`);
     } catch (e: any) {
@@ -116,6 +126,10 @@ export default function HomePage() {
         >
           방 만들기
         </button>
+
+        <p className="text-center text-xs text-gray-500">
+          방을 만들면 흑돌/백돌은 랜덤으로 배정됩니다.
+        </p>
 
         <div className="flex items-center gap-2 text-gray-500 text-sm">
           <div className="h-px flex-1 bg-gray-700" />

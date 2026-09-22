@@ -50,7 +50,6 @@ export async function POST(
   if (room.current_turn !== color) {
     return NextResponse.json({ error: "상대의 턴입니다." }, { status: 409 });
   }
-  // 착수를 먼저 마치고 이 단계에 들어와야 지뢰를 설치할 수 있다.
   if (room.phase !== "place_mine") {
     return NextResponse.json(
       { error: "먼저 착수를 해야 지뢰를 설치할 수 있습니다." },
@@ -68,7 +67,6 @@ export async function POST(
 
   const turnNumber: number = room.turn_number;
 
-  // 이미 이 칸에 활성 지뢰(자신의 것이든 상대 것이든)가 있는지 확인
   const { data: existingMines } = await supabase
     .from("mines")
     .select("*")
@@ -84,7 +82,6 @@ export async function POST(
     return NextResponse.json({ error: "이미 지뢰가 있는 자리입니다." }, { status: 400 });
   }
 
-  // 직전에 "자신이" 설치한 지뢰와 같은 칸인지 확인 (가장 최근 설치 기록 기준)
   const { data: lastOwnMine } = await supabase
     .from("mines")
     .select("*")
@@ -114,8 +111,6 @@ export async function POST(
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // 지뢰 설치까지 끝나야 비로소 턴이 상대에게 넘어간다.
-  // last_move는 방금 둔 돌 위치를 그대로 유지한다 (지뢰 위치는 절대 공개하지 않음).
   const nextColor: StoneColor = color === "black" ? "white" : "black";
   const { data: updatedRoom, error: updateError } = await supabase
     .from("rooms")

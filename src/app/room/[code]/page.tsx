@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { RoomRow } from "@/lib/game/types";
+import { RoomRow, StoneColor } from "@/lib/game/types";
 import RoomClient from "./RoomClient";
 
-interface Session {
+export interface Session {
   sessionToken: string;
-  color: "black" | "white";
+  color: StoneColor;
   nickname: string;
+  isHost: boolean;
 }
 
 export default function RoomPage() {
@@ -55,7 +56,12 @@ export default function RoomPage() {
       setError(data.error);
       return;
     }
-    const s: Session = { sessionToken: data.sessionToken, color: data.color, nickname };
+    const s: Session = {
+      sessionToken: data.sessionToken,
+      color: data.color,
+      nickname,
+      isHost: false,
+    };
     localStorage.setItem(`gomoku:${code}`, JSON.stringify(s));
     setSession(s);
     setRoom(data.room);
@@ -99,5 +105,5 @@ export default function RoomPage() {
     );
   }
 
-  return <RoomClient initialRoom={room} session={session} />;
+  return <RoomClient initialRoom={room} initialSession={session} code={code} />;
 }

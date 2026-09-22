@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { customAlphabet } from "nanoid";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { createEmptyBoard } from "@/lib/game/gomoku";
-import { GameMode } from "@/lib/game/types";
+import { GameMode, StoneColor } from "@/lib/game/types";
 
 const genCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
 
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = getServerSupabase();
   const code = genCode();
+  const hostColor: StoneColor = Math.random() < 0.5 ? "black" : "white";
 
   const { data: room, error } = await supabase
     .from("rooms")
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data: player, error: playerError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, color: "black", nickname })
+    .insert({ room_id: room.id, seat: "host", color: hostColor, nickname })
     .select()
     .single();
 
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     room,
     sessionToken: player.session_token,
-    color: "black",
+    color: hostColor,
+    isHost: true,
   });
 }

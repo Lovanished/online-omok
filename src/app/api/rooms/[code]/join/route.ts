@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { StoneColor } from "@/lib/game/types";
 
 export async function POST(
   req: NextRequest,
@@ -25,13 +26,24 @@ export async function POST(
   }
 
   if (room.guest_nickname) {
-    // 이미 두 명이 있다면 관전자로는 이번 MVP에서 지원하지 않음
     return NextResponse.json({ error: "이미 인원이 가득 찬 방입니다." }, { status: 409 });
   }
 
+  const { data: hostPlayer, error: hostError } = await supabase
+    .from("players")
+    .select("*")
+    .eq("room_id", room.id)
+    .eq("seat", "host")
+    .single();
+  if (hostError || !hostPlayer) {
+    return NextResponse.json({ error: "방 정보를 확인할 수 없습니다." }, { status: 500 });
+  }
+
+  const guestColor: StoneColor = hostPlayer.color === "black" ? "white" : "black";
+
   const { data: player, error: playerError } = await supabase
     .from("players")
-    .insert({ room_id: room.id, color: "white", nickname })
+    .insert({ room_id: room.id, seat: "guest", color: guestColor, nickname })
     .select()
     .single();
 
@@ -53,6 +65,7 @@ export async function POST(
   return NextResponse.json({
     room: updatedRoom,
     sessionToken: player.session_token,
-    color: "white",
+    color: guestColor,
+    isHost: false,
   });
 }
